@@ -44,7 +44,7 @@ st.markdown("""
 <style>
 .header {
     padding: 20px;
-    background-color: #f0f2f6;
+    background-color: #800080;
     border-radius: 10px;
     margin-bottom: 20px;
 }
