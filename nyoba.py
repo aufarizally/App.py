@@ -183,4 +183,4 @@ with tab2:
 
 # Footer
 st.markdown("---")
-st.markdown("<div style='text-align:center; color:#666;'>Dibuat khusus untuk UMKM - © 2023</div>", unsafe_allow_html=True)
+st.markdown("<div style='text-align:center; color:#666;'>DIBUAT UNTUK TUGAS UAS MATEMATIKA PEMINATAN</div>", unsafe_allow_html=True)
