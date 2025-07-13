@@ -126,7 +126,7 @@ with tab2:
         # Buah terlaris
         st.markdown("### 🏆 Buah Terlaris")
         top_fruit = metrics_df.iloc[0]
-        st.markdown(f"<div style='background-color:#808080; padding:15px; border-radius:10px;'>"
+        st.markdown(f"<div style='background-color:#FFFF00; padding:15px; border-radius:10px;'>"
                     f"<h3 style='color:#1890ff;'>🥇 {top_fruit['Buah']}</h3>"
                     f"<p>Total Penjualan: {int(top_fruit['Total Penjualan'])} unit</p>"
                     f"<p>Rata-rata Harian: {round(top_fruit['Rata-rata Harian'],1)} unit</p>"
