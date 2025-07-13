@@ -1,71 +1,50 @@
 import streamlit as st
 import pandas as pd
-import matplotlib.pyplot as plt
 import numpy as np
+import matplotlib.pyplot as plt
 from datetime import datetime, timedelta
 
-# Data contoh penjualan buah (bisa diganti dengan data real)
-def generate_sales_data():
-    fruits = ['Apel', 'Pisang', 'Anggur', 'Stroberi', 'Mangga', 'Jeruk']
-    data = {
-        'Tanggal': pd.date_range(end=datetime.today(), periods=30).date,
-    }
-    
-    for fruit in fruits:
-        # Generate random sales data with different patterns
-        if fruit == 'Pisang':  # Most popular
-            data[fruit] = np.random.randint(20, 50, 30)
-        elif fruit == 'Apel':  # Second popular
-            data[fruit] = np.random.randint(15, 40, 30)
-        else:
-            data[fruit] = np.random.randint(5, 30, 30)
-            
-    return pd.DataFrame(data)
-
-# Fungsi untuk menghitung metrik penjualan
-def calculate_sales_metrics(df):
+# Fungsi untuk menghitung metrik penjualan dan ROP
+def calculate_metrics(sales_df):
+    fruits = sales_df.columns[1:]  # Kolom pertama adalah tanggal
     metrics = {
         'Buah': [],
         'Total Penjualan': [],
         'Rata-rata Harian': [],
         'ROP': [],
-        'EOQ': [],
-        'Status': []
+        'Status Stok': []
     }
     
-    for fruit in df.columns[1:]:
-        daily_avg = df[fruit].mean()
+    for fruit in fruits:
+        daily_avg = sales_df[fruit].mean()
+        total_sales = sales_df[fruit].sum()
+        
         metrics['Buah'].append(fruit)
-        metrics['Total Penjualan'].append(df[fruit].sum())
+        metrics['Total Penjualan'].append(total_sales)
         metrics['Rata-rata Harian'].append(daily_avg)
         
-        # Simplified ROP calculation (lead_time * daily_demand)
-        # Assume 2 days lead time for all fruits
-        metrics['ROP'].append(2 * daily_avg)
+        # Hitung ROP (Reorder Point) = lead_time * rata2 harian
+        rop = 2 * daily_avg  # Default lead_time 2 hari
+        metrics['ROP'].append(round(rop, 2))
         
-        # Simplified EOQ calculation
-        # Assume ordering cost 10000 and holding cost 500 for all fruits
-        metrics['EOQ'].append(np.sqrt((2 * daily_avg * 10000) / 500))
-        
-        # Stock status (just for demo)
-        current_stock = np.random.randint(0, 100)  # Simulate random current stock
-        rop_value = 2 * daily_avg
-        if current_stock < rop_value:
-            metrics['Status'].append(f"🚨 Perlu Reorder (Stok: {current_stock})")
+        # Contoh status stok (asumsi stok saat ini)
+        current_stock = total_sales / len(sales_df) * 3  # Contoh perhitungan
+        if current_stock < rop:
+            metrics['Status Stok'].append("🚨 Perlu Reorder")
         else:
-            metrics['Status'].append(f"🟢 Aman (Stok: {current_stock})")
+            metrics['Status Stok'].append("🟢 Aman")
     
     return pd.DataFrame(metrics)
 
-# Layout Streamlit
-st.set_page_config(layout="wide", page_title="Analisis Buah & Perhitungan ROP")
+# Konfigurasi halaman
+st.set_page_config(layout="wide", page_title="Input Penjualan & Analisis Buah")
 
-# Header dengan CSS
+# CSS untuk styling
 st.markdown("""
 <style>
 .header {
-    background-color: #f8f9fa;
     padding: 20px;
+    background-color: #f0f2f6;
     border-radius: 10px;
     margin-bottom: 20px;
 }
@@ -73,108 +52,135 @@ st.markdown("""
     padding: 15px;
     border-radius: 10px;
     background-color: #ffffff;
-    box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
     margin-bottom: 15px;
+}
+.date-input {
+    margin-bottom: 20px;
 }
 </style>
 """, unsafe_allow_html=True)
 
-st.markdown('<div class="header"><h1>🍊 Analisis Penjualan Buah & Perhitungan ROP</h1></div>', unsafe_allow_html=True)
+# Header
+st.markdown('<div class="header"><h1>📊 Input Penjualan Harian & Analisis Buah Terlaris</h1></div>', unsafe_allow_html=True)
 
-# Generate sample data
-sales_df = generate_sales_data()
-metrics_df = calculate_sales_metrics(sales_df)
+# Inisialisasi atau load data penjualan
+if 'sales_data' not in st.session_state:
+    st.session_state.sales_data = pd.DataFrame(columns=['Tanggal', 'Apel', 'Pisang', 'Anggur', 'Stroberi', 'Mangga', 'Jeruk'])
 
-# Tampilkan metrik utama
-st.markdown("### 📊 Performa Penjualan 30 Hari Terakhir")
-col1, col2, col3 = st.columns(3)
-col1.metric("Total Transaksi", f"{len(sales_df)} hari")
-col2.metric("Buah Terlaris", metrics_df.sort_values('Total Penjualan', ascending=False).iloc[0]['Buah'])
-col3.metric("Total Penjualan", f"{sales_df.iloc[:,1:].sum().sum()} unit")
-
-# Buat tab untuk analisis
-tab1, tab2 = st.tabs(["📈 Analisis Buah", "📦 Manajemen Persediaan"])
+# Tab untuk input dan analisis
+tab1, tab2 = st.tabs(["📝 Input Penjualan", "📈 Analisis & ROP"])
 
 with tab1:
-    st.markdown("### 🍎 Performa Per jenis Buah")
+    st.markdown("### Masukkan Data Penjualan Harian")
     
-    # Urutkan berdasarkan penjualan
-    metrics_df = metrics_df.sort_values('Total Penjualan', ascending=False)
+    # Input tanggal
+    sale_date = st.date_input("Tanggal Penjualan", datetime.today(), key='sale_date')
     
-    # Tampilkan dalam bentuk kartu
-    for idx, row in metrics_df.iterrows():
-        with st.expander(f"{row['Buah']} - Total {row['Total Penjualan']} unit", expanded=(idx==0)):
-            col1, col2, col3 = st.columns(3)
-            col1.metric("Rata-rata Harian", f"{row['Rata-rata Harian']:.1f} unit")
-            col2.metric("ROP (Reorder Point)", f"{row['ROP']:.1f} unit")
-            col3.metric("Status Persediaan", row['Status'])
-            
-            # Buat chart untuk buah tersebut
-            fig, ax = plt.subplots(figsize=(10, 3))
-            ax.plot(sales_df['Tanggal'], sales_df[row['Buah']], label='Penjualan Harian')
-            ax.axhline(row['Rata-rata Harian'], color='red', linestyle='--', label='Rata-rata')
-            ax.set_title(f'Tren Penjualan {row["Buah"]}')
-            ax.legend()
-            st.pyplot(fig)
+    # Input penjualan per buah
+    st.markdown("**Jumlah Terjual (unit)**")
+    cols = st.columns(3)
+    
+    with cols[0]:
+        apel = st.number_input("Apel", min_value=0, key='apel')
+        pisang = st.number_input("Pisang", min_value=0, key='pisang')
+    with cols[1]:
+        anggur = st.number_input("Anggur", min_value=0, key='anggur')
+        stroberi = st.number_input("Stroberi", min_value=0, key='stroberi')
+    with cols[2]:
+        mangga = st.number_input("Mangga", min_value=0, key='mangga')
+        jeruk = st.number_input("Jeruk", min_value=0, key='jeruk')
+    
+    # Tombol submit
+    if st.button("Simpan Data Penjualan", key='save_sales'):
+        new_row = {
+            'Tanggal': sale_date,
+            'Apel': apel,
+            'Pisang': pisang,
+            'Anggur': anggur,
+            'Stroberi': stroberi,
+            'Mangga': mangga,
+            'Jeruk': jeruk
+        }
+        
+        st.session_state.sales_data = pd.concat([
+            st.session_state.sales_data, 
+            pd.DataFrame([new_row])
+        ], ignore_index=True)
+        
+        st.success("Data penjualan berhasil disimpan!")
+    
+    # Tampilkan data yang sudah diinput
+    st.markdown("### Riwayat Penjualan")
+    if not st.session_state.sales_data.empty:
+        st.dataframe(st.session_state.sales_data.sort_values('Tanggal', ascending=False))
+    else:
+        st.info("Belum ada data penjualan yang diinput.")
 
 with tab2:
-    st.markdown("### 📊 Perhitungan ROP & EOQ")
-    
-    # Pilih buah untuk perhitungan detail
-    selected_fruit = st.selectbox("Pilih Buah untuk Analisis Detail", metrics_df['Buah'].values)
-    
-    if selected_fruit:
-        fruit_data = sales_df[['Tanggal', selected_fruit]]
-        avg_daily = fruit_data[selected_fruit].mean()
+    if not st.session_state.sales_data.empty:
+        # Hitung metrik
+        metrics_df = calculate_metrics(st.session_state.sales_data)
+        metrics_df = metrics_df.sort_values('Total Penjualan', ascending=False)
         
-        with st.form(key='rop_calc_form'):
-            st.markdown(f"**{selected_fruit}** - Rata-rata penjualan harian: {avg_daily:.1f} unit")
+        # Buah terlaris
+        st.markdown("### 🏆 Buah Terlaris")
+        top_fruit = metrics_df.iloc[0]
+        st.markdown(f"<div style='background-color:#e6f7ff; padding:15px; border-radius:10px;'>"
+                    f"<h3 style='color:#1890ff;'>🥇 {top_fruit['Buah']}</h3>"
+                    f"<p>Total Penjualan: {int(top_fruit['Total Penjualan'])} unit</p>"
+                    f"<p>Rata-rata Harian: {round(top_fruit['Rata-rata Harian'],1)} unit</p>"
+                    "</div>", unsafe_allow_html=True)
+        
+        # Grafik perbandingan penjualan
+        st.markdown("### 📊 Perbandingan Penjualan Buah")
+        fig, ax = plt.subplots(figsize=(10, 5))
+        metrics_df.sort_values('Total Penjualan', ascending=True).plot(
+            x='Buah', y='Total Penjualan', kind='barh', ax=ax, color='#52c41a')
+        ax.set_title('Total Penjualan per Jenis Buah')
+        ax.set_xlabel('Jumlah Terjual (unit)')
+        st.pyplot(fig)
+        
+        # Tabel metrik & ROP
+        st.markdown("### 📦 Analisis Persediaan & ROP")
+        st.dataframe(metrics_df[['Buah', 'Rata-rata Harian', 'ROP', 'Status Stok']])
+        
+        # Perhitungan EOQ khusus untuk buah tertentu
+        st.markdown("### 🧮 Kalkulator EOQ & ROP Detail")
+        selected_fruit = st.selectbox("Pilih Buah untuk Analisis Detail:", metrics_df['Buah'].values)
+        
+        if selected_fruit:
+            fruit_data = metrics_df[metrics_df['Buah'] == selected_fruit].iloc[0]
             
-            # Input parameter
-            col1, col2, col3 = st.columns(3)
-            lead_time = col1.number_input("Lead Time (hari)", min_value=1, value=2, key='lead_time')
-            ordering_cost = col2.number_input("Biaya Pemesanan (Rp)", min_value=1, value=10000, key='ordering_cost')
-            holding_cost = col3.number_input("Biaya Penyimpanan (Rp/unit/hari)", min_value=1, value=500, key='holding_cost')
-            
-            submit_calc = st.form_submit_button("Hitung EOQ & ROP")
-            
-            if submit_calc:
-                rop = lead_time * avg_daily
-                eoq = np.sqrt((2 * avg_daily * ordering_cost) / holding_cost)
+            with st.expander("Kalkulator Lanjutan", expanded=True):
+                col1, col2 = st.columns(2)
+                lead_time = col1.number_input("Lead Time (hari)", min_value=1, value=2, key=f'lead_time_{selected_fruit}')
+                ordering_cost = col1.number_input("Biaya Pemesanan (Rp)", min_value=1, value=10000, key=f'ordering_{selected_fruit}')
+                holding_cost = col2.number_input("Biaya Penyimpanan (Rp/unit/hari)", min_value=1, value=500, key=f'holding_{selected_fruit}')
                 
-                st.success(f"**Reorder Point (ROP):** {rop:.1f} unit")
-                st.success(f"**Economic Order Quantity (EOQ):** {eoq:.1f} unit")
+                # Hitung ulang ROP dan EOQ
+                daily_avg = fruit_data['Rata-rata Harian']
+                rop = lead_time * daily_avg
+                eoq = np.sqrt((2 * daily_avg * ordering_cost) / holding_cost)
+                
+                st.metric("Reorder Point (ROP)", f"{rop:.1f} unit")
+                st.metric("Economic Order Quantity (EOQ)", f"{eoq:.1f} unit")
                 
                 # Visualisasi level stok
-                st.markdown("### 📉 Proyeksi Level Stok")
+                st.markdown("**📉 Proyeksi Level Stok**")
+                days = np.arange(0, 15)
+                stock_levels = np.maximum(0, eoq - daily_avg * days)
                 
-                days = np.arange(0, 20)
-                initial_stock = eoq
-                stock_levels = np.maximum(0, initial_stock - avg_daily * days)
-                reorder_day = np.argmax(stock_levels <= rop)
-                
-                fig, ax = plt.subplots(figsize=(10, 4))
+                fig, ax = plt.subplots(figsize=(10, 3))
                 ax.plot(days, stock_levels, label='Level Stok')
                 ax.axhline(rop, color='r', linestyle='--', label='ROP')
-                if reorder_day < len(days):
-                    ax.axvline(reorder_day, color='g', linestyle=':', label='Waktu Reorder')
+                ax.fill_between(days, 0, rop, color='red', alpha=0.1, label='Zona Reorder')
                 ax.set_title(f'Proyeksi Stok {selected_fruit}')
-                ax.set_xlabel('Hari')
-                ax.set_ylabel('Unit')
                 ax.legend()
                 st.pyplot(fig)
+    else:
+        st.warning("Silakan input data penjualan terlebih dahulu di tab Input Penjualan")
 
 # Footer
 st.markdown("---")
-st.markdown("""
-<style>
-.footer {
-    text-align: center;
-    padding: 10px;
-    color: #666;
-}
-</style>
-<div class="footer">
-Dibuat oleh Mahasiswa Teknik Informatika untuk UMKM | © 2023
-</div>
-""", unsafe_allow_html=True)
+st.markdown("<div style='text-align:center; color:#666;'>Dibuat khusus untuk UMKM - © 2023</div>", unsafe_allow_html=True)
